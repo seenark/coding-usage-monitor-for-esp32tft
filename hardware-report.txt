@@ -1,0 +1,36 @@
+ESP32 usage monitor hardware gate report
+
+Port: /dev/cu.usbserial-83340
+Probe date: 2026-07-24
+
+espflash board-info --port /dev/cu.usbserial-83340
+Chip type: esp32 (revision v3.1)
+Crystal frequency: 40 MHz
+Flash size: 4MB
+Features: WiFi, BT, Dual Core, 240MHz, VRef calibration in efuse, Coding Scheme None
+MAC address: 20:50:0d:1a:a2:0c
+Security features: None
+
+esptool ROM probes:
+Chip type: ESP32-D0WD-V3 (revision v3.1)
+Crystal frequency: 40MHz
+Flash manufacturer: c4
+Flash device: 6016
+Detected flash size: 4MB
+MAC: 20:50:0d:1a:a2:0c
+
+USB bridge registry:
+USB Product Name: USB Serial
+idVendor: 6790 (0x1a86)
+idProduct: 29987 (0x7523)
+
+Rear photo supplied: PCB silkscreen clearly reads "ESP32-2432S028". Module is Espressif ESP-WROOM-32; USB connector is micro-USB; BOOT and RST buttons are present; micro-SD socket is present; rear also exposes headers/connectors labeled VIN, RX, TX, GND, SPEAK, and display/touch wiring. The board matches the documented ESP32-2432S028 candidate family. LCD controller marking and touch-controller marking remain unreadable/not visible; TFT ID and XPT2046 behavior still require runtime probes.
+Front photo observation: orange carrier PCB with a 320x240-class TFT in portrait-oriented photograph, four corner mounting holes, and visible LCD-edge marking resembling "HMI6?1-4". This does not identify the TFT or touch controller.
+
+Arduino/PlatformIO bring-up:
+- TFT_eSPI ILI9341 candidate driver flashed successfully; six horizontal color bands were visually confirmed.
+- XPT2046 candidate wiring is GPIO25 SCLK, GPIO32 MOSI, GPIO39 MISO, GPIO33 CS, GPIO36 IRQ.
+- Touch firmware currently reports idle IRQ high with raw values (0,0,4095); no valid corner samples have been captured.
+- Direct SPI touch probe command `r` is available in the monitor firmware; its response is required before promoting the touch mapping.
+- No secure boot, flash encryption, or NVS encryption has been enabled.
+- Provider-neutral Wi-Fi and experimental Codex auth boundaries compile, but live credentials and network transport are not configured.

@@ -1,0 +1,30 @@
+[package]
+name = "codex-usage-monitor"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+
+[features]
+default = ["embassy"]
+embassy = ["esp-idf-svc/embassy-sync"]
+
+[dependencies]
+anyhow = "1"
+embedded-graphics = "0.8"
+esp-idf-hal = "0.46.2"
+esp-idf-svc = "0.52.1"
+esp-idf-sys = { version = "0.37.2", features = ["binstart"] }
+log = "0.4"
+heapless = { version = "0.8", features = ["serde"] }
+embedded-hal = "1"
+mipidsi = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde-json-core = "0.6"
+[build-dependencies]
+embuild = "0.33"
+
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
