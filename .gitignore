@@ -20,3 +20,22 @@ sdkconfig.old
 .vscode/
 .idea/
 *.swp
+
+# Runtime credentials, state, and generated artifacts
+secrets/
+data/
+build/
+**/auth.json*
+**/.credentials.json*
+**/token-dumps/
+**/token-backups/
+*.key
+firmware/build/
+firmware/managed_components/
+firmware/sdkconfig
+deploy/state/
+deploy/.auth-lock/
+
+# Admin app (web/)
+web/node_modules/
+web/dist/

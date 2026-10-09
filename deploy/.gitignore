@@ -1,0 +1,5 @@
+/.env
+/state/
+/.setup-lock/
+/.auth-lock/
+/__pycache__/

@@ -1,0 +1,156 @@
+name: ai-quota-monitor
+
+x-server: &server
+  image: ai-quota-server:local
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+    target: server
+  user: "${HOST_UID:?Run scripts/setup.sh}:${HOST_GID:?Run scripts/setup.sh}"
+  init: true
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:mode=1777
+  environment: &server-environment
+    HOME: /auth/home
+    CODEX_HOME: /auth/codex
+    CODEX_BINARY: /usr/local/bin/codex
+    CLAUDE_CONFIG_DIR: /auth/claude
+    CODEX_ENABLED: "${CODEX_ENABLED:-true}"
+    CLAUDE_PRIVATE_USAGE_ENABLED: "${CLAUDE_PRIVATE_USAGE_ENABLED:-false}"
+    CLAUDE_POLL_INTERVAL_SECONDS: "${CLAUDE_POLL_INTERVAL_SECONDS:-600}"
+    CODEX_POLL_INTERVAL_SECONDS: "${CODEX_POLL_INTERVAL_SECONDS:-300}"
+    REQUEST_TIMEOUT_SECONDS: "${REQUEST_TIMEOUT_SECONDS:-12}"
+    STALE_AFTER_SECONDS: "${STALE_AFTER_SECONDS:-900}"
+    MAX_BACKOFF_SECONDS: "${MAX_BACKOFF_SECONDS:-1800}"
+    MQTT_HOST: mosquitto
+    MQTT_PORT: "1883"
+    MQTT_USERNAME: quota-server
+    MQTT_PASSWORD_FILE: /run/secrets/mqtt-server-password
+    MQTT_CLIENT_ID: quota-server
+    MQTT_TLS: "false"
+    DEVICE_SETUP_HOST: "${MQTT_BIND_ADDRESS:-127.0.0.1}"
+    DEVICE_SETUP_PORT: "${MQTT_HOST_PORT:-1883}"
+    DEVICE_PASSWORD_FILE: /run/secrets/mqtt-device-password
+    CACHE_DIR: /var/lib/quota-server
+    # Admin app: the container always listens on 8080; `ports` below picks the host side.
+    ADMIN_LISTEN: 0.0.0.0:8080
+    WEB_DIST_DIR: /app/web
+    RUST_LOG: quota_server=info
+  volumes:
+    - ${STATE_DIR:-./state}/auth:/auth
+    - ${STATE_DIR:-./state}/cache:/var/lib/quota-server
+    - ${STATE_DIR:-./state}/secrets/mqtt-server-password:/run/secrets/mqtt-server-password:ro
+    - ${STATE_DIR:-./state}/secrets/mqtt-device-password:/run/secrets/mqtt-device-password:ro
+  # No auth in the app (docs/adr/0003): bind a loopback or private LAN address only.
+  ports:
+    - "${ADMIN_BIND_ADDRESS:-127.0.0.1}:${ADMIN_PORT:-8080}:8080"
+  depends_on:
+    mosquitto:
+      condition: service_started
+  networks: [quota]
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    user: "${HOST_UID:?Run scripts/setup.sh}:${HOST_GID:?Run scripts/setup.sh}"
+    # Bypass the image's root-only ownership-changing entrypoint.
+    entrypoint: [mosquitto]
+    command: [-c, /mosquitto/config/mosquitto.conf]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "${MQTT_BIND_ADDRESS:-127.0.0.1}:${MQTT_HOST_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ${STATE_DIR:-./state}/secrets/mosquitto-passwords:/mosquitto/auth/passwords:ro
+      - ${STATE_DIR:-./state}/broker:/mosquitto/data
+    networks: [quota]
+
+  quota-server:
+    <<: *server
+    profiles: [live]
+    environment:
+      <<: *server-environment
+      MOCK_MODE: "false"
+
+  quota-server-mock:
+    <<: *server
+    profiles: [mock]
+    environment:
+      <<: *server-environment
+      MOCK_MODE: "true"
+      MQTT_CLIENT_ID: quota-server-mock
+    # Mock cache and mounts must never touch live provider credentials.
+    volumes:
+      - ${STATE_DIR:-./state}/mock-cache:/var/lib/quota-server
+      - ${STATE_DIR:-./state}/secrets/mqtt-server-password:/run/secrets/mqtt-server-password:ro
+      - ${STATE_DIR:-./state}/secrets/mqtt-device-password:/run/secrets/mqtt-device-password:ro
+
+  auth:
+    profiles: [auth]
+    image: ai-quota-auth:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: auth
+    user: "${HOST_UID:?Run scripts/setup.sh}:${HOST_GID:?Run scripts/setup.sh}"
+    init: true
+    stdin_open: true
+    tty: true
+    logging:
+      driver: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:mode=1777]
+    environment:
+      HOME: /auth/home
+      CODEX_HOME: /auth/codex
+      CLAUDE_CONFIG_DIR: /auth/claude
+      DISABLE_AUTOUPDATER: "1"
+      DISABLE_TELEMETRY: "1"
+      DISABLE_ERROR_REPORTING: "1"
+      RUST_LOG: "off"
+    volumes:
+      - ${STATE_DIR:-./state}/auth:/auth
+
+  passwords:
+    profiles: [tools]
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    user: "${HOST_UID:?Run scripts/setup.sh}:${HOST_GID:?Run scripts/setup.sh}"
+    entrypoint: [mosquitto_passwd]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: none
+    # mosquitto_passwd -U writes a temporary file; the root filesystem is read-only.
+    tmpfs: [/tmp:mode=1777]
+    volumes:
+      - ${STATE_DIR:-./state}/secrets:/auth
+
+  subscriber:
+    profiles: [tools]
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    user: "${HOST_UID:?Run scripts/setup.sh}:${HOST_GID:?Run scripts/setup.sh}"
+    entrypoint: [mosquitto_sub]
+    command: [-h, mosquitto, -p, "1883", -t, "ai-quota/v1/#", -v]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      HOME: /client
+      XDG_CONFIG_HOME: /client
+    volumes:
+      - ${STATE_DIR:-./state}/secrets/subscriber-config:/client/mosquitto_sub:ro
+    networks: [quota]
+
+networks:
+  quota:
+    driver: bridge

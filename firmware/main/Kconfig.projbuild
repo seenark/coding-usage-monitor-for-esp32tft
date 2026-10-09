@@ -1,0 +1,129 @@
+menu "AI Quota Monitor (experimental ESP32-2432S028 preset)"
+    config QUOTA_TIMEZONE
+        string "Default POSIX timezone (not IANA)"
+        default "ICT-7"
+        help
+            Used until the server's device/config (or the last value saved in NVS) supplies a timezone.
+            ICT-7 means UTC+07:00.
+
+    config QUOTA_NTP_SERVER
+        string "SNTP server"
+        default "pool.ntp.org"
+        help
+            Use a trusted LAN time server when available. Ordinary SNTP is not authenticated.
+
+    menu "ILI9341 landscape 320x240 SPI2"
+        config QUOTA_LCD_WIDTH
+            int "Active display width (pixels)"
+            range 1 320
+            default 320
+        config QUOTA_LCD_HEIGHT
+            int "Active display height (pixels)"
+            range 1 320
+            default 240
+            help
+                Geometry must match the physical controller and MADCTL orientation.
+                The default UI targets 320x240. Smaller panels require layout review.
+        config QUOTA_LCD_SCLK
+            int "SCLK GPIO"
+            range 0 33
+            default 14
+        config QUOTA_LCD_MOSI
+            int "MOSI GPIO"
+            range 0 33
+            default 13
+        config QUOTA_LCD_MISO
+            int "MISO GPIO (-1 disables reads)"
+            range -1 39
+            default 12
+        config QUOTA_LCD_CS
+            int "CS GPIO"
+            range 0 33
+            default 15
+        config QUOTA_LCD_DC
+            int "DC GPIO"
+            range 0 33
+            default 2
+        config QUOTA_LCD_RST
+            int "Reset GPIO (-1 means tied to EN)"
+            range -1 33
+            default -1
+        config QUOTA_LCD_BL
+            int "Backlight GPIO (-1 disables control)"
+            range -1 33
+            default 21
+        config QUOTA_LCD_BL_ACTIVE_HIGH
+            bool "Backlight is active high"
+            default y
+        config QUOTA_LCD_SPI_HZ
+            int "LCD SPI clock (Hz)"
+            range 1000000 40000000
+            default 20000000
+        config QUOTA_LCD_MADCTL
+            hex "ILI9341 MADCTL (rotation / RGB order)"
+            range 0x00 0xFF
+            default 0x28
+            help
+                0x28 selects landscape MV plus BGR. Physical controller identity,
+                geometry, color order and orientation still require validation.
+        config QUOTA_LCD_INVERT
+            bool "Invert LCD colors"
+            default n
+    endmenu
+
+    menu "XPT2046 independent SPI3"
+        config QUOTA_TOUCH_SCLK
+            int "SCLK GPIO"
+            range 0 33
+            default 25
+        config QUOTA_TOUCH_MOSI
+            int "MOSI GPIO"
+            range 0 33
+            default 32
+        config QUOTA_TOUCH_MISO
+            int "MISO GPIO"
+            range 0 39
+            default 39
+        config QUOTA_TOUCH_CS
+            int "CS GPIO"
+            range 0 33
+            default 33
+        config QUOTA_TOUCH_IRQ
+            int "Active-low PENIRQ GPIO (-1 uses pressure only)"
+            range -1 39
+            default 36
+        config QUOTA_TOUCH_SPI_HZ
+            int "Touch SPI clock (Hz)"
+            range 100000 2000000
+            default 1000000
+        config QUOTA_TOUCH_PRESSURE_MIN
+            int "Minimum raw Z1 pressure"
+            range 1 4095
+            default 80
+        config QUOTA_TOUCH_X_MIN
+            int "Raw X minimum"
+            range 0 4094
+            default 512
+        config QUOTA_TOUCH_X_MAX
+            int "Raw X maximum"
+            range 1 4095
+            default 3340
+        config QUOTA_TOUCH_Y_MIN
+            int "Raw Y minimum"
+            range 0 4094
+            default 408
+        config QUOTA_TOUCH_Y_MAX
+            int "Raw Y maximum"
+            range 1 4095
+            default 3370
+        config QUOTA_TOUCH_SWAP_XY
+            bool "Map raw X to screen Y and raw Y to screen X"
+            default y
+        config QUOTA_TOUCH_INVERT_X
+            bool "Invert raw X mapping"
+            default n
+        config QUOTA_TOUCH_INVERT_Y
+            bool "Invert raw Y mapping"
+            default n
+    endmenu
+endmenu

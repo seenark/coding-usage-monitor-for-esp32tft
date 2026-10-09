@@ -1,0 +1,13 @@
+user quota-server
+topic write ai-quota/v1/providers/codex
+topic write ai-quota/v1/providers/claude
+topic write ai-quota/v1/server/status
+topic write ai-quota/v1/device/config
+topic read ai-quota/v1/device/status
+
+user esp32
+topic read ai-quota/v1/providers/codex
+topic read ai-quota/v1/providers/claude
+topic read ai-quota/v1/server/status
+topic read ai-quota/v1/device/config
+topic write ai-quota/v1/device/status

@@ -1,0 +1,69 @@
+[
+  {
+    "name": "multi-bucket-arbitrary-duration-and-partial-credits",
+    "response": {
+      "rateLimits": {"limitId": "legacy", "primary": {"usedPercent": 99, "windowDurationMins": 300, "resetsAt": 1800000000}},
+      "rateLimitsByLimitId": {
+        "codex": {"limitId": "codex", "limitName": "Codex", "primary": {"usedPercent": 20, "windowDurationMins": 300, "resetsAt": 1800000000}, "secondary": {"usedPercent": 125, "windowDurationMins": 4320, "resetsAt": 1800100000}},
+        "review": {"limitId": "review", "primary": null, "secondary": {"usedPercent": null, "windowDurationMins": null, "resetsAt": null}}
+      },
+      "rateLimitResetCredits": {
+        "availableCount": 5,
+        "credits": [
+          {"id": "opaque-credit-marker-1", "resetType": "codexRateLimits", "status": "available", "grantedAt": 1700000000, "expiresAt": 1800200000, "title": null, "description": null},
+          {"id": "opaque-credit-marker-2", "resetType": "codexRateLimits", "status": "available", "grantedAt": 1700000000, "expiresAt": null, "title": null, "description": null},
+          {"id": "opaque-credit-marker-3", "resetType": "codexRateLimits", "status": "future-status", "grantedAt": 1700000000, "expiresAt": 1800300000, "title": "private-credit-title-marker", "description": null}
+        ]
+      },
+      "accountId": "private-account-marker"
+    },
+    "windows": [
+      {"limit_id": "codex", "key": "primary", "duration_minutes": 300, "used_percent": 20.0, "remaining_percent": 80.0, "resets_at": 1800000000},
+      {"limit_id": "codex", "key": "secondary", "duration_minutes": 4320, "used_percent": 125.0, "remaining_percent": 0.0, "resets_at": 1800100000},
+      {"limit_id": "review", "key": "secondary", "duration_minutes": null, "used_percent": null, "remaining_percent": null, "resets_at": null}
+    ],
+    "banked_resets": {"available_count": 5, "details_status": "partial", "known_expirations_at": [1800200000], "known_nonexpiring_count": 0}
+  },
+  {
+    "name": "absent-windows-and-null-summary",
+    "response": {"rateLimits": {"primary": null, "secondary": null}, "rateLimitsByLimitId": null, "rateLimitResetCredits": null},
+    "windows": [],
+    "banked_resets": null
+  },
+  {
+    "name": "authoritative-count-only",
+    "response": {"rateLimits": {}, "rateLimitResetCredits": {"availableCount": 8, "credits": null}},
+    "windows": [],
+    "banked_resets": {"available_count": 8, "details_status": "unavailable", "known_expirations_at": [], "known_nonexpiring_count": 0}
+  },
+  {
+    "name": "explicitly-empty-complete-details",
+    "response": {"rateLimits": {}, "rateLimitResetCredits": {"availableCount": 0, "credits": []}},
+    "windows": [],
+    "banked_resets": {"available_count": 0, "details_status": "complete", "known_expirations_at": [], "known_nonexpiring_count": 0}
+  },
+  {
+    "name": "unknown-count-and-known-expiry",
+    "response": {"rateLimits": {}, "rateLimitResetCredits": {"availableCount": null, "credits": [{"id": "synthetic-1", "resetType": "codexRateLimits", "status": "available", "expiresAt": 1800000000}]}},
+    "windows": [],
+    "banked_resets": {"available_count": null, "details_status": "partial", "known_expirations_at": [1800000000], "known_nonexpiring_count": 0}
+  },
+  {
+    "name": "expiry-does-not-decrement-authoritative-count",
+    "response": {"rateLimits": {"primary": {"usedPercent": 75, "windowDurationMins": 17, "resetsAt": 1}}, "rateLimitResetCredits": {"availableCount": 2, "credits": [{"id": "synthetic-1", "resetType": "codexRateLimits", "status": "available", "expiresAt": 1}, {"id": "synthetic-2", "resetType": "codexRateLimits", "status": "available", "expiresAt": 1}]}},
+    "windows": [{"limit_id": "codex", "key": "primary", "duration_minutes": 17, "used_percent": 75.0, "remaining_percent": 25.0, "resets_at": 1}],
+    "banked_resets": {"available_count": 2, "details_status": "complete", "known_expirations_at": [1, 1], "known_nonexpiring_count": 0}
+  },
+  {
+    "name": "nonavailable-and-unknown-type-rows",
+    "response": {"rateLimits": {}, "rateLimitResetCredits": {"availableCount": 3, "credits": [{"id": "synthetic-1", "resetType": "codexRateLimits", "status": "redeemed", "expiresAt": 1800000000}, {"id": "synthetic-2", "resetType": "future-type", "status": "available", "expiresAt": 1800000000}, {"id": "synthetic-3", "resetType": "codexRateLimits", "status": "redeeming", "expiresAt": 1800000000}]}},
+    "windows": [],
+    "banked_resets": {"available_count": 3, "details_status": "partial", "known_expirations_at": [], "known_nonexpiring_count": 0}
+  },
+  {
+    "name": "empty-multi-bucket-map-is-authoritative",
+    "response": {"rateLimits": {"primary": {"usedPercent": 99, "resetsAt": 1800000000}}, "rateLimitsByLimitId": {}, "rateLimitResetCredits": {"availableCount": 4, "credits": []}},
+    "windows": [],
+    "banked_resets": {"available_count": 4, "details_status": "partial", "known_expirations_at": [], "known_nonexpiring_count": 0}
+  }
+]
