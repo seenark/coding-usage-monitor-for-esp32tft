@@ -1,7 +1,8 @@
 name: ai-quota-monitor
 
 x-server: &server
-  image: ai-quota-server:local
+  # Published image (linux/amd64). `up --build` builds the same tag locally instead.
+  image: ${QUOTA_IMAGE_REPO:-ghcr.io/seenark/coding-usage-monitor-for-esp32tft}/quota-server:${QUOTA_VERSION:-latest}
   build:
     context: ..
     dockerfile: deploy/Dockerfile
@@ -95,7 +96,7 @@ services:
 
   auth:
     profiles: [auth]
-    image: ai-quota-auth:local
+    image: ${QUOTA_IMAGE_REPO:-ghcr.io/seenark/coding-usage-monitor-for-esp32tft}/quota-auth:${QUOTA_VERSION:-latest}
     build:
       context: ..
       dockerfile: deploy/Dockerfile

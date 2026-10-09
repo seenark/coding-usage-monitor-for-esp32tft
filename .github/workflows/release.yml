@@ -1,0 +1,101 @@
+name: release
+
+# Publishes linux/amd64 images to GHCR and the prebuilt firmware to a GitHub Release.
+# Run by pushing a tag such as v0.1.0. arm64 is not built yet.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: quota-server, target: server }
+          - { name: quota-auth, target: auth }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  firmware:
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.3.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and merge
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          . /opt/esp/idf/export.sh
+          idf.py -C firmware -B build/firmware-esp32 set-target esp32
+          idf.py -C firmware -B build/firmware-esp32 build
+          cd build/firmware-esp32
+          # Fresh install: bootloader + partition table + app (blanks NVS, so settings reset).
+          python -m esptool --chip esp32 merge_bin -o "quota-monitor-${VERSION}-full.bin" @flash_args
+          # Update: app only, keeps saved Device setup.
+          cp ai_quota_monitor.bin "quota-monitor-${VERSION}-app.bin"
+          sha256sum quota-monitor-*.bin > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            build/firmware-esp32/quota-monitor-*.bin
+            build/firmware-esp32/SHA256SUMS
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [images, firmware]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: firmware
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" firmware/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

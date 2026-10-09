@@ -72,13 +72,13 @@ flowchart LR
 - An **ESP32-2432S028** board (the "Cheap Yellow Display", 2.8" 320×240 ILI9341 touchscreen with XPT2046 touch, ESP32-WROOM-32, 4 MB flash). The firmware ships with that board's pin map. Other boards need pin changes in `firmware/main/Kconfig.projbuild`.
 - A micro-USB cable.
 
-**Server host** (a homelab box, mini PC, Raspberry Pi 4/5 or a spare laptop)
-- Linux `amd64` or `arm64` (macOS with Docker Desktop also works for trying it out).
+**Server host** (a homelab box, mini PC, NAS or a spare laptop)
+- Linux **`amd64`** (x86-64). The prebuilt images are `linux/amd64` only. On an `arm64` machine (Raspberry Pi, Apple Silicon without emulation) build from source by adding `--build` to the `up` commands; that needs Rust's build disk space.
 - Docker Engine with Docker Compose v2, and Python 3.
 - A fixed LAN IP for that machine (see [Give the server a stable IP](#give-the-server-a-stable-ip)).
 
 **Your computer, only to flash the firmware once**
-- Docker (used to build with the official ESP-IDF image, so you do not install ESP-IDF) and [`esptool`](https://docs.espressif.com/projects/esptool/) (`pipx install esptool`).
+- [`esptool`](https://docs.espressif.com/projects/esptool/) (`pipx install esptool`) and a USB port. Docker is only needed if you choose to build the firmware yourself.
 
 **Accounts**
 - A Codex (ChatGPT) subscription and/or a Claude subscription. Either one works; you can use only one.
@@ -116,7 +116,7 @@ Use a real LAN address, never `0.0.0.0`. Then run `./scripts/setup.sh` once more
 No logins needed. This proves Docker, the broker and the Admin app work:
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml --profile mock up -d --build mosquitto quota-server-mock
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile mock up -d mosquitto quota-server-mock
 ./scripts/subscriber.sh 3 30      # prints three JSON messages
 ```
 
@@ -149,8 +149,10 @@ Login runs inside a helper container that stores credentials in `deploy/state/au
 ### 5. Start the real server
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml --profile live up -d --build mosquitto quota-server
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile live up -d mosquitto quota-server
 ```
+
+The first start downloads the prebuilt `quota-server` image (about 370 MB on disk, `linux/amd64`) from GitHub Container Registry. You do not need Rust or a compiler. To build from source instead, add `--build` (needs several GB of disk and some patience).
 
 Open `http://192.168.1.50:8080`. To turn Claude on, go to **Server settings**, switch Claude on and save. No restart is needed.
 
@@ -162,22 +164,34 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml logs quota-server |
 
 or open the **Device setup** page in the Admin app, which has a copy button for each value.
 
-### 6. Build and flash the firmware
+### 6. Flash the firmware
 
-Connect the board over USB. Find its port (`ls /dev/cu.usb*` on macOS, `ls /dev/ttyUSB*` on Linux), then:
+Connect the board over USB. Find its port (`ls /dev/cu.usb*` on macOS, `ls /dev/ttyUSB*` on Linux). Install [`esptool`](https://docs.espressif.com/projects/esptool/) once with `pipx install esptool`.
+
+**Option A, prebuilt (recommended).** Download `quota-monitor-<version>-full.bin` and `SHA256SUMS` from the [latest release](https://github.com/seenark/coding-usage-monitor-for-esp32tft/releases/latest), then:
 
 ```sh
-# Build with the official ESP-IDF container (no local ESP-IDF install)
+shasum -a 256 -c SHA256SUMS --ignore-missing
+esptool --chip esp32 -p /dev/cu.usbserial-XXXX -b 460800 write-flash 0x0 quota-monitor-<version>-full.bin
+```
+
+The `-full.bin` image also blanks the settings area, so use it for a first install. To update a board that is already set up and keep its Wi-Fi and broker settings, flash `quota-monitor-<version>-app.bin` at `0x10000` instead:
+
+```sh
+esptool --chip esp32 -p /dev/cu.usbserial-XXXX -b 460800 write-flash 0x10000 quota-monitor-<version>-app.bin
+```
+
+**Option B, build it yourself.** Needs Docker and about 5 GB of disk:
+
+```sh
 docker run --rm -v "$PWD":/project -w /project/firmware -e HOME=/tmp espressif/idf:v5.3.3 bash -c \
   'idf.py -B /project/build/firmware-esp32 set-target esp32 && idf.py -B /project/build/firmware-esp32 build'
-
-# Flash
 cd build/firmware-esp32
 esptool --chip esp32 -p /dev/cu.usbserial-XXXX -b 460800 \
   --before default-reset --after hard-reset write-flash @flash_args
 ```
 
-The build prints the app size and how much of the 4 MB layout is free. A successful flash ends with `Hash of data verified` three times, and the board reboots by itself. The firmware never prints secrets to serial, so a quiet serial console is normal.
+A successful flash ends with `Hash of data verified`, and the board reboots by itself. The firmware never prints secrets to serial, so a quiet serial console is normal.
 
 ### 7. Set up the device from your phone
 
@@ -227,9 +241,10 @@ The Admin app has **no login of its own**. It shows the device MQTT password and
 The containers use `restart: unless-stopped`, so they come back after a reboot.
 
 ```sh
-# Update
+# Update to the newest published images
 git pull
-docker compose --env-file deploy/.env -f deploy/compose.yaml --profile live up -d --build mosquitto quota-server
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile live pull
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile live up -d mosquitto quota-server
 
 # Stop everything (state is kept)
 docker compose --env-file deploy/.env -f deploy/compose.yaml --profile live --profile mock down

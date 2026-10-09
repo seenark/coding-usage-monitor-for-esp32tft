@@ -27,7 +27,7 @@ if [ -n "$(compose --profile live ps --status running -q quota-server)" ]; then
   was_running=true
 fi
 compose --profile live stop quota-server
-compose --profile auth run --rm --build auth "$provider-$operation"
+compose --profile auth run --rm auth "$provider-$operation"
 completed=true
 if [ "$was_running" = true ]; then
   compose --profile live up -d quota-server
